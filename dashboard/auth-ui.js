@@ -21,7 +21,18 @@ export function initAccess({signedIn,signedOut}){
  setupDialog.addEventListener('close',clearSetup);setupClose.onclick=()=>{clearSetup();setupDialog.close();};
  const scheduleForm=document.createElement('form'),modeLabel=e('label','Sync mode'),modeSelect=document.createElement('select'),intervalInput=field(scheduleForm,'Interval seconds','number'),dailyInput=field(scheduleForm,'Daily local time','time'),lookbackInput=field(scheduleForm,'Lookback days','number'),scheduleSave=e('button','Save synchronization settings');modeSelect.append(new Option('Interval','interval'),new Option('Daily','daily'));modeLabel.append(modeSelect);scheduleForm.prepend(modeLabel);intervalInput.min=30;intervalInput.max=86400;intervalInput.step=1;lookbackInput.min=1;lookbackInput.max=366;lookbackInput.step=1;for(const input of [intervalInput,dailyInput,lookbackInput])input.required=true;scheduleForm.append(scheduleSave);setupDialog.insertBefore(scheduleForm,setupDetails);
  scheduleForm.onsubmit=async event=>{event.preventDefault();if(!setupStore)return;scheduleSave.disabled=true;try{const data=await request('/api/backoffice/stores/'+setupStore.id+'/schedule',{method:'POST',body:JSON.stringify({mode:modeSelect.value,interval_seconds:Number(intervalInput.value),daily_at:dailyInput.value,lookback_days:Number(lookbackInput.value)})});const template=await request('/api/backoffice/stores/'+setupStore.id+'/connector');setupDetails.textContent=JSON.stringify(template.config,null,2);setupMessage.textContent=data.message;}catch(err){setupMessage.textContent=err.message;}finally{scheduleSave.disabled=false;}};
- async function openSetup(store){clearSetup();setupStore=store;setupDialog.showModal();try{const data=await request('/api/backoffice/stores/'+store.id+'/connector');setupDetails.textContent=JSON.stringify(data.config,null,2);modeSelect.value=data.config.mode;intervalInput.value=data.config.interval_seconds;dailyInput.value=data.config.daily_at;lookbackInput.value=data.config.lookback_days;setupMessage.textContent=data.instructions;}catch(err){setupMessage.textContent=err.message;}}
+ async function openSetup(store){
+  clearSetup();setupStore=store;
+  const controls=[modeSelect,intervalInput,dailyInput,lookbackInput,scheduleSave,setupRotate];
+  for(const control of controls)control.disabled=true;
+  setupMessage.textContent='Loading store configuration...';setupDialog.showModal();
+  try{
+   const data=await request('/api/backoffice/stores/'+store.id+'/connector');
+   if(!setupDialog.open||setupStore?.id!==store.id)return;
+   setupDetails.textContent=JSON.stringify(data.config,null,2);modeSelect.value=data.config.mode;intervalInput.value=data.config.interval_seconds;dailyInput.value=data.config.daily_at;lookbackInput.value=data.config.lookback_days;setupMessage.textContent=data.instructions;
+   for(const control of controls)control.disabled=false;
+  }catch(err){if(setupDialog.open&&setupStore?.id===store.id)setupMessage.textContent=err.message;}
+ }
  setupRotate.onclick=async()=>{if(!setupStore)return;const id=setupStore.id;if(!globalThis.confirm('Stop this store connector first. Issuing a new key immediately revokes its old key. Continue?'))return;setupRotate.disabled=true;setupKey.value='';setupKey.hidden=true;try{const data=await request('/api/backoffice/stores/'+id+'/rotate-key',{method:'POST',body:JSON.stringify({confirm:id})});if(setupDialog.open&&setupStore?.id===id){setupKey.value=data.key;setupKey.hidden=false;setupMessage.textContent=data.message;}}catch(err){setupMessage.textContent=err.message;}finally{setupRotate.disabled=false;}};
  function connectorActions(row,store){const setup=e('button','Connector setup','secondary'),toggle=e('button',store.active===false?'Enable uploads':'Pause uploads','secondary');setup.type=toggle.type='button';setup.onclick=()=>openSetup(store);toggle.onclick=async()=>{if(!globalThis.confirm((store.active===false?'Enable':'Pause')+' uploads for '+store.name+'? Historical reports stay available.'))return;toggle.disabled=true;try{await request('/api/backoffice/stores/'+store.id+'/activation',{method:'POST',body:JSON.stringify({active:store.active===false})});await loadBackoffice();}catch(err){backError.textContent=err.message;}finally{toggle.disabled=false;}};row.append(setup,toggle);}
  users.append(e('p','Back-office administrators manage this brand. Managers and viewers see only their assigned stores.','muted'),newUser,storesButton,audit,closeUsers,userError,userList);
@@ -83,6 +94,8 @@ export function initAccess({signedIn,signedOut}){
  if(location.protocol!=='file:')request('/auth/me').then(connected).catch(()=>login.showModal());
  return {request,getUser:()=>account,showLogin:()=>signIn.click()};
 }
+
+
 
 
 
