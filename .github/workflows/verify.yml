@@ -1,0 +1,76 @@
+name: Verify reporting platform
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: pixelpoint_test
+          POSTGRES_USER: pixelpoint
+          POSTGRES_PASSWORD: isolated_ci_only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pixelpoint -d pixelpoint_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --ignore-scripts --no-audit
+      - run: npm test
+      - run: node tests/postgres.integration.mjs
+        env:
+          TEST_DATABASE_URL: postgresql://pixelpoint:isolated_ci_only@127.0.0.1:5432/pixelpoint_test
+          TEST_DATABASE_CONFIRM_ISOLATED: 'yes'
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --ignore-scripts --no-audit
+      - run: npm install --no-save --ignore-scripts playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/backoffice-ui-qa.mjs
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm test
+      - name: Compile native 32-bit utility
+        shell: powershell
+        run: |
+          $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+          & $compiler /nologo /target:winexe /platform:x86 /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Data.dll /r:System.Security.dll /r:System.Web.Extensions.dll ('/out:'+(Join-Path $PWD 'PixelPoint-Connection-Utility.exe')) (Join-Path $PWD 'windows-setup/ConnectionUtility.cs')
+          if($LASTEXITCODE -ne 0){throw 'Utility compilation failed'}
+          $report=Join-Path $env:RUNNER_TEMP 'utility-selftest.json'
+          $process=Start-Process -FilePath (Join-Path $PWD 'PixelPoint-Connection-Utility.exe') -ArgumentList @('--self-test',('"'+$report+'"')) -WindowStyle Hidden -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Native utility self-test failed'}
+          Get-Content -LiteralPath $report
+      - name: Parse PowerShell sources
+        shell: powershell
+        run: |
+          Get-ChildItem connector,scripts,windows-setup -Filter *.ps1 -Recurse | ForEach-Object {
+            $tokens=$null;$errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors){throw ('PowerShell parsing failed: '+$_.Name)}
+          }
+      - name: Build installer
+        shell: powershell
+        run: windows-setup/build.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP 'pixelpoint-installer')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PixelPoint-Windows-utilities
+          path: |
+            PixelPoint-Connection-Utility.exe
+            ${{ runner.temp }}/pixelpoint-installer/PixelPointCloud-Setup-2.1.1.exe
+            ${{ runner.temp }}/utility-selftest.json

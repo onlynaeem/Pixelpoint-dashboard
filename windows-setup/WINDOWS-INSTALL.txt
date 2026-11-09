@@ -1,0 +1,9 @@
+Windows connector setup
+=======================
+Run the generated Windows installer into a new empty folder. Install Node.js 24 and the matching SQL Anywhere ODBC driver first. Use a reporting account configured by the database administrator.
+
+The connection utility supports DSN-only mode and explicit host/server/database settings. Test a read-only connection before attempting synchronization. Enter your own restaurant ID, cloud endpoint and connector key. Profiles are protected for the current Windows account; do not commit them.
+
+The demo requires creating an administrator account. There is no shared sign-in token. Use scripts/init-config.mjs to create bootstrap configuration with random per-installation keys. Do not commit the generated file.
+
+Use the protected launcher/startup-task documentation for unattended operation. GitHub-hosted Windows tests compile/self-test the utility but do not reach your restaurant database. Preserve outbox/sequence and private settings during updates.

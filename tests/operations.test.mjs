@@ -1,0 +1,7 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtempSync,writeFileSync,readFileSync,existsSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import {recordEvent} from '../connector/events.mjs';import {validate} from '../cloud/core.mjs';
+test('operational logs are bounded and contain fixed states without arbitrary secret messages',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'pp-events-'));try{const path=join(dir,'events.jsonl');writeFileSync(path,'x'.repeat(1048576));recordEvent(dir,'sync_failed');assert.ok(existsSync(path+'.1'));assert.equal(JSON.parse(readFileSync(path,'utf8')).state,'sync_failed');assert.throws(()=>recordEvent(dir,'password=secret'));assert.ok(!readFileSync(path,'utf8').includes('secret'));}finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('optional adapters distinguish absent, valid empty and invalid mapped data',()=>{
+ const p={day:'2026-10-01',sequence:1,reports:{transaction_summary:[],transaction_detail:[],product:[],sales_type:[]}};validate(p);validate({...p,reports:{...p.reports,payment:[]}});assert.throws(()=>validate({...p,reports:{...p.reports,payment:[{Amount:1}]}}));validate({...p,reports:{...p.reports,payment:[{'Transaction #':1,'Payment Type':'Card',Amount:'1.000'}]}});assert.throws(()=>validate({...p,reports:{...p.reports,discount:[{'Transaction #':1,Employee:'Test',Reason:'Test','Discount amount':null}]}}));
+});

@@ -1,0 +1,14 @@
+{
+  "restaurant_id": "r1",
+  "api_url": "http://127.0.0.1:8080",
+  "allow_http_local": true,
+  "key_env": "PIXELPOINT_API_KEY",
+  "timezone": "Asia/Bahrain",
+  "mode": "interval",
+  "interval_seconds": 60,
+  "daily_at": "02:00",
+  "lookback_days": 8,
+  "outbox": "connector/outbox",
+  "source_owner": "DBA",
+  "powershell_path": "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe"
+}

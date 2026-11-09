@@ -1,0 +1,10 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {DatabaseSync} from 'node:sqlite';import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import {sqliteAdministration} from '../cloud/administration.mjs';import {hash} from '../cloud/core.mjs';
+test('database administration migrates once, hashes keys, rejects stale edits and shares updates across instances',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'pp-admin-')),path=join(dir,'db');const a=new DatabaseSync(path),b=new DatabaseSync(path);try{
+ a.exec('CREATE TABLE restaurants(id TEXT PRIMARY KEY,payload TEXT)');const one=sqliteAdministration(a),two=sqliteAdministration(b),key='bootstrap-only-long-key-123456';
+ await one.initialize({restaurants:[{id:'r1',tenant_id:'t1',name:'First',currency:'BHD',timezone:'Asia/Bahrain',key}]});const x=await one.load(),y=await two.load();assert.equal(x.config.restaurants[0].key,undefined);assert.equal(x.config.restaurants[0].key_hash,hash(key));
+ x.config.restaurants[0].name='Updated';await one.save(x.config,x.version);y.config.restaurants[0].active=false;await assert.rejects(()=>two.save(y.config,y.version),e=>e.status===409);assert.equal((await two.load()).config.restaurants[0].name,'Updated');assert.equal((await two.load()).config.restaurants[0].active,undefined);
+ await two.initialize({restaurants:[{id:'r1',tenant_id:'t1',name:'Stale file',currency:'BHD',timezone:'Asia/Bahrain',key}]});assert.equal((await two.load()).config.restaurants[0].name,'Updated');assert.equal(JSON.parse(a.prepare('SELECT payload FROM restaurants WHERE id=?').get('r1').payload).name,'Updated');
+ const good=await one.load();a.exec("CREATE TRIGGER reject_seed BEFORE INSERT ON restaurants BEGIN SELECT RAISE(ABORT,'test failure'); END");good.config.restaurants[0].name='Must rollback';await assert.rejects(()=>one.save(good.config,good.version));assert.equal((await two.load()).config.restaurants[0].name,'Updated');assert.equal((await two.load()).version,good.version);
+ }finally{a.close();b.close();rmSync(dir,{recursive:true,force:true});}
+});

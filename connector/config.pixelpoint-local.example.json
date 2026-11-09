@@ -1,0 +1,14 @@
+{
+  "restaurant_id": "REPLACE_WITH_RESTAURANT_ID",
+  "api_url": "https://REPLACE_WITH_CLOUD_HOST",
+  "allow_http_local": false,
+  "key_env": "PIXELPOINT_API_KEY",
+  "timezone": "Asia/Bahrain",
+  "mode": "interval",
+  "interval_seconds": 300,
+  "daily_at": "02:00",
+  "lookback_days": 1,
+  "outbox": "connector/outbox",
+  "source_owner": "DBA",
+  "powershell_path": "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe"
+}

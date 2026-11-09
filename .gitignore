@@ -1,0 +1,25 @@
+node_modules/
+.env
+*.db
+connector/config.json
+connector/outbox/
+
+connector/secrets.json
+*.db-wal
+*.db-shm
+private/
+connector/config.pixelpoint-local.json
+
+local-live/
+# Local deployment files and runtime state
+utility-state/
+utility-selftest.json
+utility-connection-result.json
+*.exe
+*.dump
+*.log
+outputs/
+release-build*/
+
+config/cloud.json
+
